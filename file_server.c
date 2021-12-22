@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define BUFFER 50
 #define INVALID 0
 #define READ 2
 #define WRITE 4
@@ -14,9 +15,9 @@
 struct cmd
 {
 	int type;
-	char input[100];
-	char dir[100];
-	char str[100];
+	char input[BUFFER];
+	char dir[BUFFER];
+	char str[BUFFER];
 };
 
 // global variables
@@ -51,7 +52,7 @@ int getcmd(char *buf, int nbuf)
 	fgets(buf, nbuf, stdin);
 	if (buf[0] == 0)
 		return -1;
-	buf[strlen(buf) - 1] = 0;
+	buf[strlen(buf) - 1] = '\0';
 	return 1;
 }
 
@@ -61,7 +62,7 @@ struct cmd *parsecmd(char *buf)
 	char *dir;
 	char *str;
 
-	struct cmd *cmd = malloc(sizeof(cmd));
+	struct cmd *cmd = malloc(sizeof(struct cmd));
 
 	cmd->type = INVALID;
 	strcpy(cmd->input, buf);
@@ -72,26 +73,28 @@ struct cmd *parsecmd(char *buf)
 		cmd->type = WRITE;
 		dir = strtok(NULL, " ");
 		str = strtok(NULL, "\0");
-		strcpy(cmd->str, str);
+		if (str)
+			strcpy(cmd->str, str);
 	}
 	else
 	{
 		if (strcmp(command, "read") == 0)
 			cmd->type = READ;
-		if (strcmp(command, "empty") == 0)
+		else if (strcmp(command, "empty") == 0)
 			cmd->type = EMPTY;
 		dir = strtok(NULL, "\0");
 	}
 
-	strcpy(cmd->dir, dir);
+	if (dir)
+		strcpy(cmd->dir, dir);
 
 	return cmd;
 }
 
 void *master(void)
 {
-	char buf[100];
-	struct cmd *cmd = malloc(sizeof(cmd));
+	char buf[BUFFER];
+	struct cmd *cmd;
 
 	while (getcmd(buf, sizeof(buf)))
 	{
