@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define BUFFER 50
 #define INVALID 0
@@ -31,9 +32,9 @@ void *worker(struct cmd *cmd);
 
 void *logcmd(char *buf);
 
-void *read(struct cmd *cmd);
-void *write(struct cmd *cmd);
-void *empty(struct cmd *cmd);
+void *readcmd(struct cmd *cmd);
+void *writecmd(struct cmd *cmd);
+void *emptycmd(struct cmd *cmd);
 
 struct cmd *parsecmd(char *buf);
 
@@ -98,10 +99,8 @@ void *master(void)
 
 	while (getcmd(buf, sizeof(buf)))
 	{
-		sem_wait(&mutex);
 		logcmd(buf);
 		cmd = parsecmd(buf);
-		sem_post(&mutex);
 
 		pthread_create(&t_worker, NULL, (void *)worker, cmd);
 		pthread_join(t_worker, NULL);
@@ -114,15 +113,15 @@ void *worker(struct cmd *cmd)
 	{
 
 	case WRITE:
-		write(cmd);
+		writecmd(cmd);
 		break;
 
 	case READ:
-		read(cmd);
+		readcmd(cmd);
 		break;
 
 	case EMPTY:
-		empty(cmd);
+		emptycmd(cmd);
 		break;
 
 	default:
@@ -139,20 +138,48 @@ void *logcmd(char *buf)
 	fclose(f_commands);
 }
 
-void *write(struct cmd *cmd)
+void *writecmd(struct cmd *cmd)
 {
 	printf("write(%s, %s)\n", cmd->dir, cmd->str);
-	// return;
+	FILE *file = fopen(cmd->dir, "a");
+	fprintf(file, "%s\n", cmd->str);
+	fclose(file);
 }
 
-void *read(struct cmd *cmd)
+void *readcmd(struct cmd *cmd)
 {
 	printf("read(%s)\n", cmd->dir);
-	// return;
+
+	FILE *file = fopen(cmd->dir, "r");
+	FILE *f_read = fopen("read.txt", "a");
+	char cont[BUFFER];
+	fprintf(f_read, "%s: ", cmd->input);
+	if (file)
+		while (fgets(cont, BUFFER, file))
+			fprintf(f_read, "%s", cont);
+	else
+		fprintf(f_read, "FILE DNE\n");
+	fclose(file);
+	fclose(f_read);
 }
 
-void *empty(struct cmd *cmd)
+void *emptycmd(struct cmd *cmd)
 {
 	printf("empty(%s)\n", cmd->dir);
-	// return;
+	FILE *file = fopen(cmd->dir, "w+");
+	FILE *f_empty = fopen("empty.txt", "a");
+	char cont[BUFFER];
+	fprintf(f_empty, "%s: ", cmd->input);
+	if (file)
+	{
+		sem_wait(&mutex);
+		while (fgets(cont, BUFFER, file))
+			fprintf(f_empty, "%s", cont);
+		sem_post(&mutex);
+		fprintf(file, "");
+	}
+	else
+		fprintf(f_empty, "FILE ALREADY EMPTY\n");
+	fclose(file);
+	fclose(f_empty);
 }
