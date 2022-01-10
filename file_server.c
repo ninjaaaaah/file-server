@@ -27,7 +27,6 @@ pthread_t t_master;
 pthread_t t_worker;
 
 // function declarations
-void *master(void);
 void *worker(struct cmd *cmd);
 
 void *logcmd(char *buf);
@@ -43,8 +42,17 @@ int getcmd(char *buf, int nbuf);
 int main()
 {
 	sem_init(&mutex, 0, 1);
-	pthread_create(&t_master, NULL, (void *)master, NULL);
-	pthread_join(t_master, NULL);
+	char buf[BUFFER];
+	struct cmd *cmd;
+
+	while (getcmd(buf, sizeof(buf)))
+	{
+		logcmd(buf);
+		cmd = parsecmd(buf);
+
+		pthread_create(&t_worker, NULL, (void *)worker, cmd);
+		pthread_detach(t_worker);
+	}
 }
 
 int getcmd(char *buf, int nbuf)
@@ -92,21 +100,6 @@ struct cmd *parsecmd(char *buf)
 	return cmd;
 }
 
-void *master(void)
-{
-	char buf[BUFFER];
-	struct cmd *cmd;
-
-	while (getcmd(buf, sizeof(buf)))
-	{
-		logcmd(buf);
-		cmd = parsecmd(buf);
-
-		pthread_create(&t_worker, NULL, (void *)worker, cmd);
-		pthread_join(t_worker, NULL);
-	}
-}
-
 void *worker(struct cmd *cmd)
 {
 	switch (cmd->type)
@@ -140,7 +133,6 @@ void *logcmd(char *buf)
 
 void *writecmd(struct cmd *cmd)
 {
-	printf("write(%s, %s)\n", cmd->dir, cmd->str);
 	FILE *file = fopen(cmd->dir, "a");
 	fprintf(file, "%s\n", cmd->str);
 	fclose(file);
@@ -148,8 +140,6 @@ void *writecmd(struct cmd *cmd)
 
 void *readcmd(struct cmd *cmd)
 {
-	printf("read(%s)\n", cmd->dir);
-
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_read = fopen("read.txt", "a");
 	char cont[BUFFER];
@@ -165,7 +155,6 @@ void *readcmd(struct cmd *cmd)
 
 void *emptycmd(struct cmd *cmd)
 {
-	printf("empty(%s)\n", cmd->dir);
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_empty = fopen("empty.txt", "a");
 	char cont[BUFFER];
