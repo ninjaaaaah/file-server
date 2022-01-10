@@ -6,7 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define BUFFER 50
+#define BUFFER 420
 #define INVALID 0
 #define READ 2
 #define WRITE 4
@@ -23,7 +23,6 @@ struct cmd
 
 // global variables
 sem_t mutex;
-pthread_t t_master;
 pthread_t t_worker;
 
 // function declarations
@@ -125,51 +124,62 @@ void *worker(struct cmd *cmd)
 
 void *logcmd(char *buf)
 {
-	FILE *f_commands;
-	f_commands = fopen("commands.txt", "a");
+	FILE *f_commands = fopen("commands.txt", "a");
+	sem_wait(&mutex);
 	fprintf(f_commands, "%s\n", buf);
 	fclose(f_commands);
+	sem_post(&mutex);
 }
 
 void *writecmd(struct cmd *cmd)
 {
+	// printf("write(%s, %s)\n", cmd->dir, cmd->str);
 	FILE *file = fopen(cmd->dir, "a");
+	sem_wait(&mutex);
 	fprintf(file, "%s\n", cmd->str);
 	fclose(file);
+	sem_post(&mutex);
 }
 
 void *readcmd(struct cmd *cmd)
 {
+	// printf("read(%s)\n", cmd->dir);
+
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_read = fopen("read.txt", "a");
 	char cont[BUFFER];
 	fprintf(f_read, "%s: ", cmd->input);
+	sem_wait(&mutex);
 	if (file)
+	{
 		while (fgets(cont, BUFFER, file))
 			fprintf(f_read, "%s", cont);
+		fclose(file);
+	}
 	else
 		fprintf(f_read, "FILE DNE\n");
-	fclose(file);
 	fclose(f_read);
+	sem_post(&mutex);
 }
 
 void *emptycmd(struct cmd *cmd)
 {
+	// printf("empty(%s)\n", cmd->dir);
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_empty = fopen("empty.txt", "a");
 	char cont[BUFFER];
 	fprintf(f_empty, "%s: ", cmd->input);
+	sem_wait(&mutex);
 	if (file)
 	{
-		sem_wait(&mutex);
 		while (fgets(cont, BUFFER, file))
 			fprintf(f_empty, "%s", cont);
 		fclose(file);
 		file = fopen(cmd->dir, "w");
-		sem_post(&mutex);
+		fclose(file);
 	}
 	else
 		fprintf(f_empty, "FILE ALREADY EMPTY\n");
-	fclose(file);
 	fclose(f_empty);
+	sem_post(&mutex);
 }

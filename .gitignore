@@ -3,3 +3,6 @@ commands.txt
 file_server
 .vscode
 .editorconfig
+/outputs
+hello.txt
+empty.txt
