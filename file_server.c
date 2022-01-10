@@ -166,7 +166,7 @@ void *readcmd(struct cmd *cmd)
 void *emptycmd(struct cmd *cmd)
 {
 	printf("empty(%s)\n", cmd->dir);
-	FILE *file = fopen(cmd->dir, "w+");
+	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_empty = fopen("empty.txt", "a");
 	char cont[BUFFER];
 	fprintf(f_empty, "%s: ", cmd->input);
@@ -175,8 +175,9 @@ void *emptycmd(struct cmd *cmd)
 		sem_wait(&mutex);
 		while (fgets(cont, BUFFER, file))
 			fprintf(f_empty, "%s", cont);
+		fclose(file);
+		file = fopen(cmd->dir, "w");
 		sem_post(&mutex);
-		fprintf(file, "");
 	}
 	else
 		fprintf(f_empty, "FILE ALREADY EMPTY\n");
