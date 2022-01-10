@@ -12,7 +12,11 @@
 #define WRITE 4
 #define EMPTY 8
 
-// structs
+// == S T R U C T S == //
+
+// Command structure that contains
+// the necessary information that
+// the functions will use
 struct cmd
 {
 	int type;
@@ -21,23 +25,54 @@ struct cmd
 	char str[BUFFER];
 };
 
-// global variables
+// == G L O B A L  V A R I A B L E S == //
+
+// Used as a lock variable to
+// prevent data races while
+// files are being processed.
 sem_t mutex;
+
+// Thread that is assigned to run
+// the worker function.
 pthread_t t_worker;
 
-// function declarations
+// == F U N C T I O N S == //
+
+// Works as a worker thread that is spawned
+// each time the master thread dispatches
+// on request.
 void *worker(struct cmd *cmd);
 
+// Logs the command input
+// onto the commands.txt file.
 void *logcmd(char *buf);
 
+// Reads the contents of a file and
+// writes it onto read.txt.
 void *readcmd(struct cmd *cmd);
+
+// Writes a string on the specified
+// file.
 void *writecmd(struct cmd *cmd);
+
+// Writes a content of a file to empty.txt
+// and empties the file.
 void *emptycmd(struct cmd *cmd);
 
+// Deconstructs the input buffer into
+// command, directory, and str which
+// will be used to execute certain
+// functions.
 struct cmd *parsecmd(char *buf);
 
+// Resets the buf memory address and
+// places the result of fgets then
+// truncates the endline character.
 int getcmd(char *buf, int nbuf);
 
+// Acts as the master thread as C implicitly
+// creates a thread that handles this part
+// of the program.
 int main()
 {
 	sem_init(&mutex, 0, 1);
@@ -103,19 +138,15 @@ void *worker(struct cmd *cmd)
 {
 	switch (cmd->type)
 	{
-
 	case WRITE:
 		writecmd(cmd);
 		break;
-
 	case READ:
 		readcmd(cmd);
 		break;
-
 	case EMPTY:
 		emptycmd(cmd);
 		break;
-
 	default:
 		printf("unsupported command\n");
 	}
@@ -133,7 +164,6 @@ void *logcmd(char *buf)
 
 void *writecmd(struct cmd *cmd)
 {
-	// printf("write(%s, %s)\n", cmd->dir, cmd->str);
 	FILE *file = fopen(cmd->dir, "a");
 	sem_wait(&mutex);
 	fprintf(file, "%s\n", cmd->str);
@@ -143,8 +173,6 @@ void *writecmd(struct cmd *cmd)
 
 void *readcmd(struct cmd *cmd)
 {
-	// printf("read(%s)\n", cmd->dir);
-
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_read = fopen("read.txt", "a");
 	char cont[BUFFER];
@@ -164,7 +192,6 @@ void *readcmd(struct cmd *cmd)
 
 void *emptycmd(struct cmd *cmd)
 {
-	// printf("empty(%s)\n", cmd->dir);
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_empty = fopen("empty.txt", "a");
 	char cont[BUFFER];
