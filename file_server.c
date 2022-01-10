@@ -15,6 +15,17 @@
 
 // == S T R U C T S == //
 
+// Command structure that contains
+// the necessary information that
+// the functions will use
+struct cmd
+{
+	int type;
+	char input[BUFFER];
+	char dir[BUFFER];
+	char str[BUFFER];
+};
+
 // Queue structure that holds all
 // the values of commands that have
 // been saved from user input.
@@ -32,23 +43,16 @@ struct chain
 	struct chain *next;
 };
 
-// Command structure that contains
-// the necessary information that
-// the functions will use
-struct cmd
-{
-	int type;
-	char input[BUFFER];
-	char dir[BUFFER];
-	char str[BUFFER];
-};
-
 // == G L O B A L  V A R I A B L E S == //
 
 // Used as a lock variable to
 // prevent data races while
 // files are being processed.
 sem_t mutex;
+
+// Used as a lock variable to
+// prevent data races while
+// the queue is being accessed.
 sem_t queue_lock;
 
 // Thread that is assigned to run
@@ -57,7 +61,7 @@ pthread_t t_worker;
 
 // == F U N C T I O N S == //
 
-// Pushes cmd into queue q.
+// Pushes cmd struct cmd into queue struct q.
 void push_queue(struct queue *q, struct cmd *cmd)
 {
 	struct chain *nc;
@@ -145,7 +149,8 @@ void *readcmd(struct cmd *cmd)
 }
 
 // Writes a string on the specified
-// file.
+// file and creates the file if it
+// doesn't exist.
 void *writecmd(struct cmd *cmd)
 {
 	FILE *file = fopen(cmd->dir, "a");
