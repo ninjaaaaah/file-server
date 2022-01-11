@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <time.h>
 
-#define BUFFER 420
+#define BUFFER 50
 #define INVALID 0
 #define READ 1
 #define WRITE 2
@@ -113,15 +113,29 @@ void randsleep(int type)
 	}
 }
 
+// Fetches the system time
+// and outputs a string
+// formatted timestamp.
+char *gettime()
+{
+	time_t *current;
+	current = malloc(sizeof(time_t));
+	time(current);
+
+	return ctime(current);
+}
+
 // Logs the command input
 // onto the commands.txt file.
 void *logcmd(char *buf)
 {
 	FILE *f_commands = fopen("commands.txt", "a");
-	fprintf(f_commands, "%s\n", buf);
+	fprintf(f_commands, "%s | %s", buf, gettime());
 	fclose(f_commands);
 }
 
+// Error handling in case command from
+// input is not supported.
 void invalidcmd(struct cmd *cmd)
 {
 	printf("Unsupported command!\n");
@@ -134,7 +148,7 @@ void readcmd(struct cmd *cmd)
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_read = fopen("read.txt", "a");
 	char cont[BUFFER];
-	fprintf(f_read, "%s: ", cmd->input);
+	fprintf(f_read, "%s:\t", cmd->input);
 	if (file)
 	{
 		while (fgets(cont, BUFFER, file))
@@ -164,7 +178,7 @@ void emptycmd(struct cmd *cmd)
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_empty = fopen("empty.txt", "a");
 	char cont[BUFFER];
-	fprintf(f_empty, "%s: ", cmd->input);
+	fprintf(f_empty, "%s:\t", cmd->input);
 	if (file)
 	{
 		while (fgets(cont, BUFFER, file))
@@ -264,7 +278,7 @@ int main()
 	queue = malloc(sizeof(struct queue));
 	sem_init(&mutex, 0, 1);
 	sem_init(&queue_lock, 0, 1);
-	char buf[BUFFER];
+	char buf[2 * BUFFER + 8];
 	struct cmd *cmd;
 
 	while (getcmd(buf, sizeof(buf)))
