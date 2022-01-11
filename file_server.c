@@ -9,9 +9,9 @@
 
 #define BUFFER 420
 #define INVALID 0
-#define READ 2
-#define WRITE 4
-#define EMPTY 8
+#define READ 1
+#define WRITE 2
+#define EMPTY 3
 
 // == S T R U C T S == //
 
@@ -24,6 +24,7 @@ struct cmd
 	char input[BUFFER];
 	char dir[BUFFER];
 	char str[BUFFER];
+	struct cmd *next;
 };
 
 // Queue structure that holds all
@@ -31,16 +32,8 @@ struct cmd
 // been saved from user input.
 struct queue
 {
-	struct chain *head;
-	struct chain *tail;
-};
-
-// Chain structure that links cmds
-// in the queue.
-struct chain
-{
-	struct cmd *cmd;
-	struct chain *next;
+	struct cmd *head;
+	struct cmd *tail;
 };
 
 // == G L O B A L  V A R I A B L E S == //
@@ -64,16 +57,20 @@ pthread_t t_worker;
 // Pushes cmd struct cmd into queue struct q.
 void push_queue(struct queue *q, struct cmd *cmd)
 {
-	struct chain *nc;
-	nc = malloc(sizeof(struct chain));
-	nc->cmd = cmd;
-	nc->next = NULL;
+	struct cmd *ncmd;
+	ncmd = malloc(sizeof(struct cmd));
+
+	ncmd->type = cmd->type;
+	strcpy(ncmd->input, cmd->input);
+	strcpy(ncmd->str, cmd->str);
+	strcpy(ncmd->dir, cmd->dir);
+	ncmd->next = NULL;
 
 	if (!q->head)
-		q->head = nc;
+		q->head = ncmd;
 	else
-		q->tail->next = nc;
-	q->tail = nc;
+		q->tail->next = ncmd;
+	q->tail = ncmd;
 }
 
 // Pops the queue and returns the head cmd.
@@ -82,15 +79,15 @@ struct cmd *pop_queue(struct queue *q)
 	struct cmd *cmd;
 	cmd = malloc(sizeof(struct cmd));
 
-	cmd->type = q->head->cmd->type;
-	strcpy(cmd->input, q->head->cmd->input);
-	strcpy(cmd->dir, q->head->cmd->dir);
-	strcpy(cmd->str, q->head->cmd->str);
+	cmd->type = q->head->type;
+	strcpy(cmd->input, q->head->input);
+	strcpy(cmd->dir, q->head->dir);
+	strcpy(cmd->str, q->head->str);
 
-	struct chain *tc;
-	tc = q->head;
-	q->head = tc->next;
-	free(tc);
+	struct cmd *tcmd;
+	tcmd = q->head;
+	q->head = tcmd->next;
+	free(tcmd);
 
 	return cmd;
 }
@@ -121,21 +118,23 @@ void randsleep(int type)
 void *logcmd(char *buf)
 {
 	FILE *f_commands = fopen("commands.txt", "a");
-	sem_wait(&mutex);
 	fprintf(f_commands, "%s\n", buf);
 	fclose(f_commands);
-	sem_post(&mutex);
+}
+
+void invalidcmd(struct cmd *cmd)
+{
+	printf("Unsupported command!\n");
 }
 
 // Reads the contents of a file and
 // writes it onto read.txt.
-void *readcmd(struct cmd *cmd)
+void readcmd(struct cmd *cmd)
 {
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_read = fopen("read.txt", "a");
 	char cont[BUFFER];
 	fprintf(f_read, "%s: ", cmd->input);
-	sem_wait(&mutex);
 	if (file)
 	{
 		while (fgets(cont, BUFFER, file))
@@ -145,30 +144,26 @@ void *readcmd(struct cmd *cmd)
 	else
 		fprintf(f_read, "FILE DNE\n");
 	fclose(f_read);
-	sem_post(&mutex);
 }
 
 // Writes a string on the specified
 // file and creates the file if it
 // doesn't exist.
-void *writecmd(struct cmd *cmd)
+void writecmd(struct cmd *cmd)
 {
 	FILE *file = fopen(cmd->dir, "a");
-	sem_wait(&mutex);
 	fprintf(file, "%s\n", cmd->str);
 	fclose(file);
 	sleep(strlen(cmd->str) * 0.025);
-	sem_post(&mutex);
 }
 
 // Writes a content of a file to empty.txt
 // and empties the file.
-void *emptycmd(struct cmd *cmd)
+void emptycmd(struct cmd *cmd)
 {
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_empty = fopen("empty.txt", "a");
 	char cont[BUFFER];
-	sem_wait(&mutex);
 	fprintf(f_empty, "%s: ", cmd->input);
 	if (file)
 	{
@@ -181,7 +176,6 @@ void *emptycmd(struct cmd *cmd)
 	else
 		fprintf(f_empty, "FILE ALREADY EMPTY\n");
 	fclose(f_empty);
-	sem_post(&mutex);
 	randsleep(2);
 }
 
@@ -239,33 +233,26 @@ int getcmd(char *buf, int nbuf)
 	return 0;
 }
 
+// Array of function pointers of
+// the supported functions.
+void (*functions[])(struct cmd *) = {invalidcmd, readcmd, writecmd, emptycmd};
+
 // Works as a worker thread that is spawned
 // each time the master thread dispatches
 // on request.
 void *worker(struct queue *q)
 {
+	randsleep(1);
+
 	sem_wait(&queue_lock);
 	struct cmd *cmd = pop_queue(q);
+	logcmd(cmd->input);
+	functions[cmd->type](cmd);
 	sem_post(&queue_lock);
-
-	randsleep(1);
-	switch (cmd->type)
-	{
-	case WRITE:
-		writecmd(cmd);
-		break;
-	case READ:
-		readcmd(cmd);
-		break;
-	case EMPTY:
-		emptycmd(cmd);
-		break;
-	default:
-		printf("unsupported command\n");
-	}
 
 	free(cmd);
 	sem_destroy(&mutex);
+	sem_destroy(&queue_lock);
 }
 
 // Acts as the master thread as C implicitly
@@ -282,9 +269,9 @@ int main()
 
 	while (getcmd(buf, sizeof(buf)))
 	{
-		logcmd(buf);
 		if (!strlen(buf))
 			continue;
+
 		cmd = parsecmd(buf);
 		push_queue(queue, cmd);
 
