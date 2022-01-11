@@ -6,7 +6,7 @@ This file server handles three different user requests and utilizes threads and 
 
 ## Dependencies
 
-This file server is written and C so gcc should be avaiable to be used for compilation.
+This file server is written in C so gcc should be avaiable to be used for compilation.
 
 The file server was also tested in WSL Ubuntu-20.04 but it should work on any distros of Linux and Windows as long as gcc is available.
 
@@ -14,13 +14,13 @@ The file server was also tested in WSL Ubuntu-20.04 but it should work on any di
 
 The _file_server.c_ file is compiled using the gcc command.
 
-```bash
+```
 gcc file_server.c -lpthread -o file_server
 ```
 
 And is executed by running the command below.
 
-```bash
+```
 ./file_server
 ```
 
@@ -34,7 +34,7 @@ Testing could be done in two ways.
 
     It is done by following the command below.
 
-    ```bash
+    ```
     cat test.in | ./file_server
     ```
 
@@ -60,13 +60,13 @@ The file server would be able to support the following commands:
 
 - When the file exists, it appends the following to a file named **"read.txt"**:
 
-    ```bash
+    ```
     <entire_command>:   <file_contents><newline>
     ```
 
 - Otherwise, it appends: 
 
-    ```bash
+    ```
     <entire_command>:   FILE DNE<newline>
     ```
 
@@ -78,7 +78,7 @@ The file server would be able to support the following commands:
 
 - When the file exists, it appends the following to a file named **"read.txt"**:
 
-    ```bash
+    ```
     <entire_command>:   <file_contents><newline>
     ```
 
@@ -86,7 +86,7 @@ The file server would be able to support the following commands:
 
 - Otherwise, it appends: 
 
-    ```bash
+    ```
     <entire_command>:   FILE DNE<newline>
     ```
 
