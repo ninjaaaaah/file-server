@@ -1,6 +1,5 @@
 #include <pthread.h>
 #include <semaphore.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,30 +17,29 @@
 // Command structure that contains
 // the necessary information that
 // the functions will use
+typedef struct cmd CMD;
+
+// Queue structure that holds all
+// the values of commands that have
+// been saved from user input.
+typedef struct queue Queue;
+
 struct cmd
 {
 	int type;
 	char input[2 * BUFFER + 8];
 	char dir[BUFFER];
 	char str[BUFFER];
-	struct cmd *next;
+	CMD *next;
 };
 
-// Queue structure that holds all
-// the values of commands that have
-// been saved from user input.
 struct queue
 {
-	struct cmd *head;
-	struct cmd *tail;
+	CMD *head;
+	CMD *tail;
 };
 
 // == G L O B A L  V A R I A B L E S == //
-
-// Used as a lock variable to
-// prevent data races while
-// files are being processed.
-sem_t mutex;
 
 // Used as a lock variable to
 // prevent data races while
@@ -54,11 +52,10 @@ pthread_t t_worker;
 
 // == F U N C T I O N S == //
 
-// Pushes cmd struct cmd into queue struct q.
-void push_queue(struct queue *q, struct cmd *cmd)
+// Pushes CMD cmd into Queue queue.
+void push_queue(Queue *q, CMD *cmd)
 {
-	struct cmd *ncmd;
-	ncmd = malloc(sizeof(struct cmd));
+	CMD *ncmd = malloc(sizeof(CMD));
 
 	ncmd->type = cmd->type;
 	strcpy(ncmd->input, cmd->input);
@@ -74,17 +71,16 @@ void push_queue(struct queue *q, struct cmd *cmd)
 }
 
 // Pops the queue and returns the head cmd.
-struct cmd *pop_queue(struct queue *q)
+CMD *pop_queue(Queue *q)
 {
-	struct cmd *cmd;
-	cmd = malloc(sizeof(struct cmd));
+	CMD *cmd = malloc(sizeof(CMD));
 
 	cmd->type = q->head->type;
 	strcpy(cmd->input, q->head->input);
 	strcpy(cmd->dir, q->head->dir);
 	strcpy(cmd->str, q->head->str);
 
-	struct cmd *tcmd;
+	CMD *tcmd;
 	tcmd = q->head;
 	q->head = tcmd->next;
 	free(tcmd);
@@ -118,8 +114,7 @@ void randsleep(int type)
 // formatted timestamp.
 char *gettime()
 {
-	time_t *current;
-	current = malloc(sizeof(time_t));
+	time_t *current = (time_t *)malloc(sizeof(time_t));
 	time(current);
 
 	return ctime(current);
@@ -136,14 +131,14 @@ void *logcmd(char *buf)
 
 // Error handling in case command from
 // input is not supported.
-void invalidcmd(struct cmd *cmd)
+void invalidcmd(CMD *cmd)
 {
 	printf("Unsupported command!\n");
 }
 
 // Reads the contents of a file and
 // writes it onto read.txt.
-void readcmd(struct cmd *cmd)
+void readcmd(CMD *cmd)
 {
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_read = fopen("read.txt", "a");
@@ -163,7 +158,7 @@ void readcmd(struct cmd *cmd)
 // Writes a string on the specified
 // file and creates the file if it
 // doesn't exist.
-void writecmd(struct cmd *cmd)
+void writecmd(CMD *cmd)
 {
 	FILE *file = fopen(cmd->dir, "a");
 	fprintf(file, "%s\n", cmd->str);
@@ -173,7 +168,7 @@ void writecmd(struct cmd *cmd)
 
 // Writes a content of a file to empty.txt
 // and empties the file.
-void emptycmd(struct cmd *cmd)
+void emptycmd(CMD *cmd)
 {
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_empty = fopen("empty.txt", "a");
@@ -197,13 +192,12 @@ void emptycmd(struct cmd *cmd)
 // command, directory, and str which
 // will be used to execute certain
 // functions.
-struct cmd *parsecmd(char *buf)
+CMD *parsecmd(char *buf)
 {
+	CMD *cmd = malloc(sizeof(CMD));
 	char *command;
 	char *dir;
 	char *str;
-
-	struct cmd *cmd = malloc(sizeof(struct cmd));
 
 	cmd->type = INVALID;
 	strcpy(cmd->input, buf);
@@ -228,7 +222,6 @@ struct cmd *parsecmd(char *buf)
 
 	if (dir)
 		strcpy(cmd->dir, dir);
-
 	if (cmd->type)
 		logcmd(cmd->input);
 
@@ -252,22 +245,21 @@ int getcmd(char *buf, int nbuf)
 
 // Array of function pointers of
 // the supported functions.
-void (*functions[])(struct cmd *) = {invalidcmd, readcmd, writecmd, emptycmd};
+void (*functions[])(CMD *) = {invalidcmd, readcmd, writecmd, emptycmd};
 
 // Works as a worker thread that is spawned
 // each time the master thread dispatches
 // on request.
-void *worker(struct queue *q)
+void *worker(Queue *q)
 {
 	randsleep(1);
 
 	sem_wait(&queue_lock);
-	struct cmd *cmd = pop_queue(q);
+	CMD *cmd = pop_queue(q);
 	functions[cmd->type](cmd);
 	sem_post(&queue_lock);
 
 	free(cmd);
-	sem_destroy(&mutex);
 	sem_destroy(&queue_lock);
 }
 
@@ -276,12 +268,11 @@ void *worker(struct queue *q)
 // of the program.
 int main()
 {
-	struct queue *queue;
-	queue = malloc(sizeof(struct queue));
-	sem_init(&mutex, 0, 1);
-	sem_init(&queue_lock, 0, 1);
+	Queue *queue = malloc(sizeof(Queue));
+	CMD *cmd;
 	char buf[2 * BUFFER + 8];
-	struct cmd *cmd;
+
+	sem_init(&queue_lock, 0, 1);
 
 	while (getcmd(buf, sizeof(buf)))
 	{
