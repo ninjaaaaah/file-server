@@ -18,12 +18,6 @@
 // the necessary information that
 // the functions will use
 typedef struct cmd CMD;
-
-// Queue structure that holds all
-// the values of commands that have
-// been saved from user input.
-typedef struct queue Queue;
-
 struct cmd
 {
 	int type;
@@ -33,6 +27,10 @@ struct cmd
 	CMD *next;
 };
 
+// Queue structure that holds all
+// the values of commands that have
+// been saved from user input.
+typedef struct queue Queue;
 struct queue
 {
 	CMD *head;
@@ -122,7 +120,7 @@ char *gettime()
 
 // Logs the command input
 // onto the commands.txt file.
-void *logcmd(char *buf)
+void logcmd(char *buf)
 {
 	FILE *f_commands = fopen("commands.txt", "a");
 	fprintf(f_commands, "%s | %s", buf, gettime());
@@ -142,12 +140,12 @@ void readcmd(CMD *cmd)
 {
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_read = fopen("read.txt", "a");
-	char cont[BUFFER];
+	char c;
 	fprintf(f_read, "%s:\t", cmd->input);
 	if (file)
 	{
-		while (fgets(cont, BUFFER, file))
-			fprintf(f_read, "%s", cont);
+		while ((c = fgetc(file)) != EOF)
+			fprintf(f_read, "%c", c);
 		fclose(file);
 	}
 	else
@@ -161,7 +159,7 @@ void readcmd(CMD *cmd)
 void writecmd(CMD *cmd)
 {
 	FILE *file = fopen(cmd->dir, "a");
-	fprintf(file, "%s\n", cmd->str);
+	fprintf(file, "%s", cmd->str);
 	fclose(file);
 	sleep(strlen(cmd->str) * 0.025);
 }
@@ -172,20 +170,21 @@ void emptycmd(CMD *cmd)
 {
 	FILE *file = fopen(cmd->dir, "r");
 	FILE *f_empty = fopen("empty.txt", "a");
-	char cont[BUFFER];
+	char c;
+
 	fprintf(f_empty, "%s:\t", cmd->input);
 	if (file)
 	{
-		while (fgets(cont, BUFFER, file))
-			fprintf(f_empty, "%s", cont);
+		while ((c = fgetc(file)) != EOF)
+			fprintf(f_empty, "%c", c);
 		fclose(file);
 		file = fopen(cmd->dir, "w");
 		fclose(file);
+		randsleep(2);
 	}
 	else
 		fprintf(f_empty, "FILE ALREADY EMPTY\n");
 	fclose(f_empty);
-	randsleep(2);
 }
 
 // Deconstructs the input buffer into
@@ -263,6 +262,15 @@ void *worker(Queue *q)
 	sem_destroy(&queue_lock);
 }
 
+void emptyfiles()
+{
+	int i = 4;
+	char *files[4] = {"commands.txt", "write.txt", "read.txt", "empty.txt"};
+	FILE *file;
+	while (i--)
+		file = fopen(files[i], "w");
+}
+
 // Acts as the master thread as C implicitly
 // creates a thread that handles this part
 // of the program.
@@ -271,6 +279,8 @@ int main()
 	Queue *queue = malloc(sizeof(Queue));
 	CMD *cmd;
 	char buf[2 * BUFFER + 8];
+
+	emptyfiles();
 
 	sem_init(&queue_lock, 0, 1);
 
