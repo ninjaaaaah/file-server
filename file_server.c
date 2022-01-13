@@ -21,7 +21,7 @@
 struct cmd
 {
 	int type;
-	char input[BUFFER];
+	char input[2 * BUFFER + 8];
 	char dir[BUFFER];
 	char str[BUFFER];
 	struct cmd *next;
@@ -229,6 +229,9 @@ struct cmd *parsecmd(char *buf)
 	if (dir)
 		strcpy(cmd->dir, dir);
 
+	if (cmd->type)
+		logcmd(cmd->input);
+
 	return cmd;
 }
 
@@ -260,7 +263,6 @@ void *worker(struct queue *q)
 
 	sem_wait(&queue_lock);
 	struct cmd *cmd = pop_queue(q);
-	logcmd(cmd->input);
 	functions[cmd->type](cmd);
 	sem_post(&queue_lock);
 
