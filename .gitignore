@@ -5,4 +5,11 @@ file_server
 .editorconfig
 /outputs
 hello.txt
+hi.txt
+a
+Documentations.md
 empty.txt
+test.in
+muts.in
+file_queue
+file_queue.c

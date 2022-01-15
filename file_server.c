@@ -4,45 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <time.h>
 
-#define BUFFER 50
-#define INVALID 0
-#define READ 1
-#define WRITE 2
-#define EMPTY 3
-
-// == S T R U C T S == //
-
-// Command structure that contains
-// the necessary information that
-// the functions will use
-typedef struct cmd CMD;
-struct cmd
-{
-	int type;
-	char input[2 * BUFFER + 8];
-	char dir[BUFFER];
-	char str[BUFFER];
-	CMD *next;
-};
-
-// Queue structure that holds all
-// the values of commands that have
-// been saved from user input.
-typedef struct queue Queue;
-struct queue
-{
-	CMD *head;
-	CMD *tail;
-};
+#include "definitions.h"
+#include "commands.c"
 
 // == G L O B A L  V A R I A B L E S == //
-
-// Used as a lock variable to
-// prevent data races while
-// the queue is being accessed.
-sem_t queue_lock;
+int active_files = 0;
 
 // Thread that is assigned to run
 // the worker function.
@@ -50,26 +17,25 @@ pthread_t t_worker;
 
 // == F U N C T I O N S == //
 
-// Pushes CMD cmd into Queue queue.
-void push_queue(Queue *q, CMD *cmd)
+// Pushes CMD cmd into CMDQueue queue.
+void enqueueCMD(CMDQueue *cq, CMD *cmd)
 {
 	CMD *ncmd = malloc(sizeof(CMD));
-
-	ncmd->type = cmd->type;
+	strcpy(ncmd->dir, cmd->dir);
 	strcpy(ncmd->input, cmd->input);
 	strcpy(ncmd->str, cmd->str);
-	strcpy(ncmd->dir, cmd->dir);
+	ncmd->type = cmd->type;
 	ncmd->next = NULL;
 
-	if (!q->head)
-		q->head = ncmd;
+	if (!cq->head)
+		cq->head = ncmd;
 	else
-		q->tail->next = ncmd;
-	q->tail = ncmd;
+		cq->tail->next = ncmd;
+	cq->tail = ncmd;
 }
 
 // Pops the queue and returns the head cmd.
-CMD *pop_queue(Queue *q)
+CMD *dequeueCMD(CMDQueue *q)
 {
 	CMD *cmd = malloc(sizeof(CMD));
 
@@ -86,189 +52,112 @@ CMD *pop_queue(Queue *q)
 	return cmd;
 }
 
-// Sleeps for simulating file access.
-void randsleep(int type)
+FileQueue *initFQ()
 {
-	srand(time(0));
-	int r;
-	switch (type)
-	{
-	case 1:
-		r = rand() % 100;
-		if (r < 80)
-			sleep(1);
+	FileQueue *fq = malloc(sizeof(FileQueue));
+	fq->head = NULL;
+	fq->tail = NULL;
+	return fq;
+}
+
+CMDQueue *initCQ()
+{
+	CMDQueue *cq = malloc(sizeof(CMDQueue));
+	cq->head = NULL;
+	cq->tail = NULL;
+	return cq;
+}
+
+File *createFile(CMD *cmd)
+{
+	File *f = malloc(sizeof(File));
+	f->commands = malloc(sizeof(CMDQueue));
+	f->commands->head = NULL;
+	f->commands->tail = NULL;
+	strcpy(f->dir, cmd->dir);
+
+	sem_t *sem = malloc(sizeof(sem_t));
+	f->sem = sem;
+	sem_init(f->sem, 0, 1);
+
+	return f;
+}
+
+File *enqueueFile(FileQueue *fq, File *f)
+{
+	File *nf = malloc(sizeof(File));
+	strcpy(nf->dir, f->dir);
+	nf->commands = f->commands;
+	nf->sem = f->sem;
+	nf->next = NULL;
+
+	if (!fq->head)
+		fq->head = nf;
+	else
+		fq->tail->next = nf;
+	fq->tail = nf;
+
+	return nf;
+}
+
+File *getFile(FileQueue *fq, CMD *cmd)
+{
+	File *cursor = fq->head;
+	int i;
+	for (i = 0; i < active_files; i++)
+		if (strcmp(cursor->dir, cmd->dir) == 0)
+			return cursor;
 		else
-			sleep(6);
-		break;
-	case 2:
-		r = rand() % 3;
-		sleep(7 + r);
-		break;
-	}
-}
+			cursor = cursor->next;
 
-// Fetches the system time
-// and outputs a string
-// formatted timestamp.
-char *gettime()
-{
-	time_t *current = (time_t *)malloc(sizeof(time_t));
-	time(current);
-
-	return ctime(current);
-}
-
-// Logs the command input
-// onto the commands.txt file.
-void logcmd(char *buf)
-{
-	FILE *f_commands = fopen("commands.txt", "a");
-	fprintf(f_commands, "%s | %s", buf, gettime());
-	fclose(f_commands);
-}
-
-// Error handling in case command from
-// input is not supported.
-void invalidcmd(CMD *cmd)
-{
-	printf("Unsupported command!\n");
-}
-
-// Reads the contents of a file and
-// writes it onto read.txt.
-void readcmd(CMD *cmd)
-{
-	FILE *file = fopen(cmd->dir, "r");
-	FILE *f_read = fopen("read.txt", "a");
-	char c;
-	fprintf(f_read, "%s:\t", cmd->input);
-	if (file)
-	{
-		while ((c = fgetc(file)) != EOF)
-			fprintf(f_read, "%c", c);
-		fclose(file);
-	}
-	else
-		fprintf(f_read, "FILE DNE\n");
-	fclose(f_read);
-}
-
-// Writes a string on the specified
-// file and creates the file if it
-// doesn't exist.
-void writecmd(CMD *cmd)
-{
-	FILE *file = fopen(cmd->dir, "a");
-	fprintf(file, "%s", cmd->str);
-	fclose(file);
-	sleep(strlen(cmd->str) * 0.025);
-}
-
-// Writes a content of a file to empty.txt
-// and empties the file.
-void emptycmd(CMD *cmd)
-{
-	FILE *file = fopen(cmd->dir, "r");
-	FILE *f_empty = fopen("empty.txt", "a");
-	char c;
-
-	fprintf(f_empty, "%s:\t", cmd->input);
-	if (file)
-	{
-		while ((c = fgetc(file)) != EOF)
-			fprintf(f_empty, "%c", c);
-		fclose(file);
-		file = fopen(cmd->dir, "w");
-		fclose(file);
-		randsleep(2);
-	}
-	else
-		fprintf(f_empty, "FILE ALREADY EMPTY\n");
-	fclose(f_empty);
-}
-
-// Deconstructs the input buffer into
-// command, directory, and str which
-// will be used to execute certain
-// functions.
-CMD *parsecmd(char *buf)
-{
-	CMD *cmd = malloc(sizeof(CMD));
-	char *command;
-	char *dir;
-	char *str;
-
-	cmd->type = INVALID;
-	strcpy(cmd->input, buf);
-
-	command = strtok(buf, " ");
-	if (strcmp(command, "write") == 0)
-	{
-		cmd->type = WRITE;
-		dir = strtok(NULL, " ");
-		str = strtok(NULL, "\0");
-		if (str)
-			strcpy(cmd->str, str);
-	}
-	else
-	{
-		if (strcmp(command, "read") == 0)
-			cmd->type = READ;
-		else if (strcmp(command, "empty") == 0)
-			cmd->type = EMPTY;
-		dir = strtok(NULL, "\0");
-	}
-
-	if (dir)
-		strcpy(cmd->dir, dir);
-	if (cmd->type)
-		logcmd(cmd->input);
-
-	return cmd;
-}
-
-// Resets the buf memory address and
-// places the result of fgets then
-// truncates the endline character.
-int getcmd(char *buf, int nbuf)
-{
-	memset(buf, 0, nbuf);
-	fgets(buf, nbuf, stdin);
-	if (strlen(buf))
-	{
-		buf[strlen(buf) - 1] = '\0';
-		return 1;
-	}
-	return 0;
+	active_files++;
+	return enqueueFile(fq, createFile(cmd));
 }
 
 // Array of function pointers of
 // the supported functions.
-void (*functions[])(CMD *) = {invalidcmd, readcmd, writecmd, emptycmd};
+void (*execute[])(CMD *) = {invalidcmd, readcmd, writecmd, emptycmd};
 
 // Works as a worker thread that is spawned
 // each time the master thread dispatches
 // on request.
-void *worker(Queue *q)
+void *worker(Args *q)
 {
 	randsleep(1);
+	CMD *cmd = dequeueCMD(q->cq);
+	File *file = getFile(q->fq, cmd);
 
-	sem_wait(&queue_lock);
-	CMD *cmd = pop_queue(q);
-	functions[cmd->type](cmd);
-	sem_post(&queue_lock);
+	sem_wait(file->sem);
+	cmd = dequeueCMD(file->commands);
+	execute[cmd->type](cmd);
+	logcmd(cmd->input, "done.txt");
+	sem_post(file->sem);
 
-	free(cmd);
-	sem_destroy(&queue_lock);
+	sem_destroy(file->sem);
 }
 
-void emptyfiles()
+void *traverseCommands(CMDQueue *cq)
 {
-	int i = 4;
-	char *files[4] = {"commands.txt", "write.txt", "read.txt", "empty.txt"};
-	FILE *file;
-	while (i--)
-		file = fopen(files[i], "w");
+	CMD *cursor = cq->head;
+
+	do
+		printf("%s\n", cursor->input);
+	while ((cursor = cursor->next) != NULL);
+
+	printf("===\n");
+}
+
+void *traverseFiles(FileQueue *fq)
+{
+	File *cursor = fq->head;
+
+	do
+	{
+		printf("FILE: %s\n===\n", cursor->dir);
+		traverseCommands(cursor->commands);
+	} while ((cursor = cursor->next) != NULL);
+
+	printf("= END OF FILE QUEUE =\n");
 }
 
 // Acts as the master thread as C implicitly
@@ -276,23 +165,29 @@ void emptyfiles()
 // of the program.
 int main()
 {
-	Queue *queue = malloc(sizeof(Queue));
-	CMD *cmd;
-	char buf[2 * BUFFER + 8];
+	FileQueue *active = initFQ();
+	CMDQueue *request = initCQ();
+
+	Args *args = malloc(sizeof(Args));
+	args->fq = active;
+	args->cq = request;
 
 	emptyfiles();
 
-	sem_init(&queue_lock, 0, 1);
+	char buf[2 * BUFFER + 8];
 
 	while (getcmd(buf, sizeof(buf)))
 	{
 		if (!strlen(buf))
 			continue;
 
-		cmd = parsecmd(buf);
-		push_queue(queue, cmd);
+		CMD *cmd = parsecmd(buf);
 
-		pthread_create(&t_worker, NULL, (void *)worker, queue);
+		enqueueCMD(request, cmd);
+		File *file = getFile(active, cmd);
+		enqueueCMD(file->commands, cmd);
+
+		pthread_create(&t_worker, NULL, (void *)worker, args);
 		pthread_detach(t_worker);
 	}
 	return 0;
