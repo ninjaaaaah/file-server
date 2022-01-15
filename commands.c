@@ -2,16 +2,51 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <time.h>
 
-#include "structs.c"
-#include "time.c"
+#include "definitions.h"
+
+// Sleeps for simulating file access.
+void randsleep(int type)
+{
+    srand(time(0));
+    int r;
+    switch (type)
+    {
+    case 1:
+        r = rand() % 100;
+        if (r < 80)
+            sleep(1);
+        else
+            sleep(6);
+        break;
+    case 2:
+        r = rand() % 4;
+        sleep(7 + r);
+        break;
+    }
+}
+
+// Fetches the system time
+// and outputs a string
+// formatted timestamp.
+char *gettime()
+{
+    time_t *current = (time_t *)malloc(sizeof(time_t));
+    time(current);
+
+    char *time = ctime(current);
+    time[strlen(time) - 1] = 0;
+
+    return time;
+}
 
 // Logs the command input
-// onto the commands.txt file.
+// onto the file name provided at file.
 void logcmd(char *buf, char *file)
 {
     FILE *log = fopen(file, "a");
-    fprintf(log, "[%s] %s\n", gettime(), buf);
+    fprintf(log, "[%s]: %s\n", gettime(), buf);
     fclose(log);
 }
 
@@ -34,6 +69,7 @@ void readcmd(CMD *cmd)
     {
         while ((c = fgetc(file)) != EOF)
             fprintf(f_read, "%c", c);
+        fprintf(f_read, "\n");
         fclose(file);
     }
     else
@@ -53,7 +89,6 @@ void writecmd(CMD *cmd)
         fprintf(file, "%c", cmd->str[i++]);
         sleep(0.025);
     }
-    fprintf(file, "\n");
     fclose(file);
 }
 
@@ -96,6 +131,9 @@ CMD *parsecmd(char *buf)
     strcpy(cmd->input, buf);
 
     command = strtok(buf, " ");
+    if (!command)
+        return cmd;
+
     if (strcmp(command, "write") == 0)
     {
         cmd->type = WRITE;
@@ -136,10 +174,12 @@ int getcmd(char *buf, int nbuf)
     return 0;
 }
 
+// Empties all the log files used
+// in this program.
 void emptyfiles()
 {
-    int i = 5;
-    char *files[5] = {"commands.txt", "write.txt", "read.txt", "empty.txt", "done.txt"};
+    int i = 4;
+    char *files[4] = {"commands.txt", "read.txt", "empty.txt", "dump.txt"};
     FILE *file;
     while (i--)
         file = fopen(files[i], "w");

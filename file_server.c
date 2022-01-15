@@ -5,7 +5,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "definitions.h"
 #include "commands.c"
 
 // == G L O B A L  V A R I A B L E S == //
@@ -17,7 +16,28 @@ pthread_t t_worker;
 
 // == F U N C T I O N S == //
 
-// Pushes CMD cmd into CMDQueue queue.
+// Initializes the values of
+// the FileQueue.
+FileQueue *initFQ()
+{
+	FileQueue *fq = malloc(sizeof(FileQueue));
+	fq->head = NULL;
+	fq->tail = NULL;
+	return fq;
+}
+
+// Initializes the values of
+// the CommandQueue.
+CMDQueue *initCQ()
+{
+	CMDQueue *cq = malloc(sizeof(CMDQueue));
+	cq->head = NULL;
+	cq->tail = NULL;
+	return cq;
+}
+
+// Creates a copy of CMD cmd and enqueues
+// it into CMDQueue cq.
 void enqueueCMD(CMDQueue *cq, CMD *cmd)
 {
 	CMD *ncmd = malloc(sizeof(CMD));
@@ -34,7 +54,8 @@ void enqueueCMD(CMDQueue *cq, CMD *cmd)
 	cq->tail = ncmd;
 }
 
-// Pops the queue and returns the head cmd.
+// Returns the cmd at head and
+// dequeues the head of q.
 CMD *dequeueCMD(CMDQueue *q)
 {
 	CMD *cmd = malloc(sizeof(CMD));
@@ -52,28 +73,13 @@ CMD *dequeueCMD(CMDQueue *q)
 	return cmd;
 }
 
-FileQueue *initFQ()
-{
-	FileQueue *fq = malloc(sizeof(FileQueue));
-	fq->head = NULL;
-	fq->tail = NULL;
-	return fq;
-}
-
-CMDQueue *initCQ()
-{
-	CMDQueue *cq = malloc(sizeof(CMDQueue));
-	cq->head = NULL;
-	cq->tail = NULL;
-	return cq;
-}
-
+// Creates a file that assigns
+// the value of the command dir
+// to its dir field.
 File *createFile(CMD *cmd)
 {
 	File *f = malloc(sizeof(File));
-	f->commands = malloc(sizeof(CMDQueue));
-	f->commands->head = NULL;
-	f->commands->tail = NULL;
+	f->commands = initCQ();
 	strcpy(f->dir, cmd->dir);
 
 	sem_t *sem = malloc(sizeof(sem_t));
@@ -83,6 +89,7 @@ File *createFile(CMD *cmd)
 	return f;
 }
 
+// Pushes a file f into the FileQueue fq.
 File *enqueueFile(FileQueue *fq, File *f)
 {
 	File *nf = malloc(sizeof(File));
@@ -100,6 +107,10 @@ File *enqueueFile(FileQueue *fq, File *f)
 	return nf;
 }
 
+// Loops through all the active files
+// in the FileQueue fq and returns the
+// file with its file->dir that matches
+// the cmd->dir.
 File *getFile(FileQueue *fq, CMD *cmd)
 {
 	File *cursor = fq->head;
@@ -114,50 +125,25 @@ File *getFile(FileQueue *fq, CMD *cmd)
 	return enqueueFile(fq, createFile(cmd));
 }
 
-// Array of function pointers of
-// the supported functions.
+// Array of function pointers that
+// corresponds to the function that
+// is being executed.
 void (*execute[])(CMD *) = {invalidcmd, readcmd, writecmd, emptycmd};
 
 // Works as a worker thread that is spawned
 // each time the master thread dispatches
 // on request.
-void *worker(Args *q)
+void *worker(File *file)
 {
 	randsleep(1);
-	CMD *cmd = dequeueCMD(q->cq);
-	File *file = getFile(q->fq, cmd);
 
 	sem_wait(file->sem);
-	cmd = dequeueCMD(file->commands);
+	CMD *cmd = dequeueCMD(file->commands);
 	execute[cmd->type](cmd);
-	logcmd(cmd->input, "done.txt");
+	logcmd(cmd->input, "dump.txt");
 	sem_post(file->sem);
 
 	sem_destroy(file->sem);
-}
-
-void *traverseCommands(CMDQueue *cq)
-{
-	CMD *cursor = cq->head;
-
-	do
-		printf("%s\n", cursor->input);
-	while ((cursor = cursor->next) != NULL);
-
-	printf("===\n");
-}
-
-void *traverseFiles(FileQueue *fq)
-{
-	File *cursor = fq->head;
-
-	do
-	{
-		printf("FILE: %s\n===\n", cursor->dir);
-		traverseCommands(cursor->commands);
-	} while ((cursor = cursor->next) != NULL);
-
-	printf("= END OF FILE QUEUE =\n");
 }
 
 // Acts as the master thread as C implicitly
@@ -166,28 +152,20 @@ void *traverseFiles(FileQueue *fq)
 int main()
 {
 	FileQueue *active = initFQ();
-	CMDQueue *request = initCQ();
-
-	Args *args = malloc(sizeof(Args));
-	args->fq = active;
-	args->cq = request;
+	char buf[2 * BUFFER + 8];
 
 	emptyfiles();
 
-	char buf[2 * BUFFER + 8];
-
 	while (getcmd(buf, sizeof(buf)))
 	{
-		if (!strlen(buf))
+		CMD *cmd = parsecmd(buf);
+		if (!cmd->type)
 			continue;
 
-		CMD *cmd = parsecmd(buf);
-
-		enqueueCMD(request, cmd);
 		File *file = getFile(active, cmd);
 		enqueueCMD(file->commands, cmd);
 
-		pthread_create(&t_worker, NULL, (void *)worker, args);
+		pthread_create(&t_worker, NULL, (void *)worker, file);
 		pthread_detach(t_worker);
 	}
 	return 0;
