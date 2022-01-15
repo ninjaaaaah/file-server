@@ -4,9 +4,11 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "definitions.h"
+#include "queue.c"
 
-// Sleeps for simulating file access.
+/**
+ * Sleeps for simulating file access.
+ */
 void randsleep(int type)
 {
     srand(time(0));
@@ -27,10 +29,13 @@ void randsleep(int type)
     }
 }
 
-// Fetches the system time
-// and outputs a string
-// formatted timestamp.
-char *gettime()
+/**
+ * Fetches the system time
+ * and outputs a string
+ * formatted timestamp.
+ */
+char *
+gettime()
 {
     time_t *current = (time_t *)malloc(sizeof(time_t));
     time(current);
@@ -41,8 +46,10 @@ char *gettime()
     return time;
 }
 
-// Logs the command input
-// onto the file name provided at file.
+/**
+ * Logs the command input onto
+ * the file name provided at file.
+ */
 void logcmd(char *buf, char *file)
 {
     FILE *log = fopen(file, "a");
@@ -50,15 +57,19 @@ void logcmd(char *buf, char *file)
     fclose(log);
 }
 
-// Error handling in case command from
-// input is not supported.
+/**
+ * Error handling in case command from
+ * input is not supported.
+ */
 void invalidcmd(CMD *cmd)
 {
     printf("Unsupported command!\n");
 }
 
-// Reads the contents of a file and
-// writes it onto read.txt.
+/**
+ * Reads the contents of a file and
+ * writes it onto read.txt.
+ */
 void readcmd(CMD *cmd)
 {
     FILE *file = fopen(cmd->dir, "r");
@@ -77,9 +88,11 @@ void readcmd(CMD *cmd)
     fclose(f_read);
 }
 
-// Writes a string on the specified
-// file and creates the file if it
-// doesn't exist.
+/**
+ * Writes a string on the specified
+ * file and creates the file if it
+ * doesn't exist.
+ */
 void writecmd(CMD *cmd)
 {
     FILE *file = fopen(cmd->dir, "a");
@@ -92,8 +105,10 @@ void writecmd(CMD *cmd)
     fclose(file);
 }
 
-// Writes a content of a file to empty.txt
-// and empties the file.
+/*
+ * Writes a content of a file to empty.txt
+ * and empties the file.
+ */
 void emptycmd(CMD *cmd)
 {
     FILE *file = fopen(cmd->dir, "r");
@@ -116,10 +131,12 @@ void emptycmd(CMD *cmd)
     fclose(f_empty);
 }
 
-// Deconstructs the input buffer into
-// command, directory, and str which
-// will be used to execute certain
-// functions.
+/**
+ * Deconstructs the input buffer into
+ * command, directory, and str which
+ * will be used to execute certain
+ * functions.
+ */
 CMD *parsecmd(char *buf)
 {
     CMD *cmd = malloc(sizeof(CMD));
@@ -159,9 +176,11 @@ CMD *parsecmd(char *buf)
     return cmd;
 }
 
-// Resets the buf memory address and
-// places the result of fgets then
-// truncates the endline character.
+/**
+ * Resets the buf memory address and
+ * places the result of fgets then
+ * truncates the endline character.
+ */
 int getcmd(char *buf, int nbuf)
 {
     memset(buf, 0, nbuf);
@@ -174,8 +193,10 @@ int getcmd(char *buf, int nbuf)
     return 0;
 }
 
-// Empties all the log files used
-// in this program.
+/**
+ * Empties all the log files used
+ * in this program.
+ */
 void emptyfiles()
 {
     int i = 4;
@@ -185,3 +206,10 @@ void emptyfiles()
         file = fopen(files[i], "w");
     fclose(file);
 }
+
+/**
+ * Array of function pointers that
+ * corresponds to the function that
+ * is being executed.
+ */
+void (*execute[])(CMD *) = {invalidcmd, readcmd, writecmd, emptycmd};

@@ -6,11 +6,11 @@
 #define WRITE 2
 #define EMPTY 3
 
-// == S T R U C T S == //
-
-// Command structure that contains
-// the necessary information that
-// the functions will use
+/**
+ * Command structure that contains
+ * the necessary information that
+ * the functions will use
+ */
 typedef struct cmd CMD;
 struct cmd
 {
@@ -21,9 +21,11 @@ struct cmd
     CMD *next;
 };
 
-// CMDQueue structure that holds all
-// the values of commands that have
-// been saved from user input.
+/**
+ * CMDQueue structure that holds all
+ * the values of commands that have
+ * been saved from user input.
+ */
 typedef struct cqueue CMDQueue;
 struct cqueue
 {
@@ -31,8 +33,15 @@ struct cqueue
     CMD *tail;
 };
 
-typedef struct files File;
-struct files
+/**
+ * File structure holds a corresponding
+ * CMDQueue that would be dequeued
+ * to get the command to execute and
+ * a semaphore for locking the critical
+ * section of modifying a file.
+ */
+typedef struct file File;
+struct file
 {
     char dir[BUFFER];
     CMDQueue *commands;
@@ -40,9 +49,26 @@ struct files
     File *next;
 };
 
+/**
+ * FileQueue structure acts as a queue
+ * of files which links the Files together
+ * in a queue.
+ */
 typedef struct fqueue FileQueue;
 struct fqueue
 {
     File *head;
     File *tail;
 };
+
+/**
+ * Number of currently open files
+ * with corresponding commands.
+ */
+int active_files = 0;
+
+/**
+ * Thread that is assigned to run
+ * the worker function.
+ */
+pthread_t t_worker;
