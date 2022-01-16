@@ -51,9 +51,8 @@ struct file
 };
 
 /**
- * FileQueue structure acts as a queue
- * of files which links the Files together
- * in a queue.
+ * FileQueue structure which acts as a
+ * queue of Files.
  */
 typedef struct fqueue FileQueue;
 struct fqueue

@@ -7,7 +7,10 @@
 #include "queue.c"
 
 /**
- * Sleeps for simulating file access.
+ * Sleeps according to
+ * the specifications
+ * for simulating file
+ * access.
  */
 void randsleep(int type)
 {
@@ -149,26 +152,28 @@ CMD *parsecmd(char *buf)
 
     if (strcmp(command, "write") == 0)
     {
-        cmd->type = WRITE;
         dir = strtok(NULL, " ");
         str = strtok(NULL, "\0");
-        if (str)
-            strcpy(cmd->str, str);
+        if (!str)
+            return cmd;
+        strcpy(cmd->str, str);
+        cmd->type = WRITE;
     }
     else
     {
+        dir = strtok(NULL, "\0");
+        if (!dir)
+            return cmd;
         if (strcmp(command, "read") == 0)
             cmd->type = READ;
         else if (strcmp(command, "empty") == 0)
             cmd->type = EMPTY;
-        dir = strtok(NULL, "\0");
+        else
+            return cmd;
     }
+    strcpy(cmd->dir, dir);
 
-    if (dir)
-        strcpy(cmd->dir, dir);
-    if (cmd->type)
-        logcmd(cmd->input, "commands.txt");
-
+    logcmd(cmd->input, "commands.txt");
     return cmd;
 }
 
