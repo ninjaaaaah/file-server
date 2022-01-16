@@ -34,8 +34,7 @@ void randsleep(int type)
  * and outputs a string
  * formatted timestamp.
  */
-char *
-gettime()
+char *gettime()
 {
     time_t *current = (time_t *)malloc(sizeof(time_t));
     time(current);
