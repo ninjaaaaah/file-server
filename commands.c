@@ -120,7 +120,6 @@ void emptycmd(CMD *cmd)
         while ((c = fgetc(file)) != EOF)
             fprintf(f_empty, "%c", c);
         fprintf(f_empty, "\n");
-        fclose(file);
         file = fopen(cmd->dir, "w");
         fclose(file);
         randsleep(2);

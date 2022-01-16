@@ -34,6 +34,7 @@ int main()
 {
 	FileQueue *active = initFQ();
 	char buf[2 * BUFFER + 8];
+	pthread_t t_worker;
 
 	emptyfiles();
 

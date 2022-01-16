@@ -9,6 +9,7 @@
 FileQueue *initFQ()
 {
     FileQueue *fq = malloc(sizeof(FileQueue));
+    fq->count = 0;
     fq->head = NULL;
     fq->tail = NULL;
     return fq;
@@ -21,6 +22,7 @@ FileQueue *initFQ()
 CMDQueue *initCQ()
 {
     CMDQueue *cq = malloc(sizeof(CMDQueue));
+    cq->count = 0;
     cq->head = NULL;
     cq->tail = NULL;
     return cq;
@@ -38,6 +40,7 @@ void enqueueCMD(CMDQueue *cq, CMD *cmd)
     strcpy(ncmd->str, cmd->str);
     ncmd->type = cmd->type;
     ncmd->next = NULL;
+    cq->count++;
 
     if (!cq->head)
         cq->head = ncmd;
@@ -50,18 +53,17 @@ void enqueueCMD(CMDQueue *cq, CMD *cmd)
  * Returns the cmd at head and
  * dequeues the head of q.
  */
-CMD *dequeueCMD(CMDQueue *q)
+CMD *dequeueCMD(CMDQueue *cq)
 {
     CMD *cmd = malloc(sizeof(CMD));
+    cmd->type = cq->head->type;
+    strcpy(cmd->input, cq->head->input);
+    strcpy(cmd->dir, cq->head->dir);
+    strcpy(cmd->str, cq->head->str);
+    cq->count--;
 
-    cmd->type = q->head->type;
-    strcpy(cmd->input, q->head->input);
-    strcpy(cmd->dir, q->head->dir);
-    strcpy(cmd->str, q->head->str);
-
-    CMD *tcmd;
-    tcmd = q->head;
-    q->head = tcmd->next;
+    CMD *tcmd = cq->head;
+    cq->head = tcmd->next;
     free(tcmd);
 
     return cmd;
@@ -88,21 +90,20 @@ File *createFile(CMD *cmd)
 /**
  * Pushes a file f into the FileQueue fq.
  */
-File *enqueueFile(FileQueue *fq, File *f)
+void enqueueFile(FileQueue *fq, File *f)
 {
     File *nf = malloc(sizeof(File));
     strcpy(nf->dir, f->dir);
     nf->commands = f->commands;
     nf->sem = f->sem;
     nf->next = NULL;
+    fq->count++;
 
     if (!fq->head)
         fq->head = nf;
     else
         fq->tail->next = nf;
     fq->tail = nf;
-
-    return nf;
 }
 
 /**
@@ -115,12 +116,14 @@ File *getFile(FileQueue *fq, CMD *cmd)
 {
     File *cursor = fq->head;
     int i;
-    for (i = 0; i < active_files; i++)
+    for (i = 0; i < fq->count; i++)
         if (strcmp(cursor->dir, cmd->dir) == 0)
             return cursor;
         else
             cursor = cursor->next;
 
-    active_files++;
-    return enqueueFile(fq, createFile(cmd));
+    cursor = createFile(cmd);
+    enqueueFile(fq, cursor);
+
+    return cursor;
 }

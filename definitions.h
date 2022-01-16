@@ -29,6 +29,7 @@ struct cmd
 typedef struct cqueue CMDQueue;
 struct cqueue
 {
+    int count;
     CMD *head;
     CMD *tail;
 };
@@ -57,15 +58,10 @@ struct file
 typedef struct fqueue FileQueue;
 struct fqueue
 {
+    int count;
     File *head;
     File *tail;
 };
-
-/**
- * Number of currently open files
- * with corresponding commands.
- */
-int active_files = 0;
 
 /**
  * Thread that is assigned to run
