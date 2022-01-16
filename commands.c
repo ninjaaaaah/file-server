@@ -66,6 +66,23 @@ void invalidcmd(CMD *cmd)
 }
 
 /**
+ * Writes a string on the specified
+ * file and creates the file if it
+ * doesn't exist.
+ */
+void writecmd(CMD *cmd)
+{
+    FILE *file = fopen(cmd->dir, "a");
+    int i = 0;
+    while (cmd->str[i] != '\0')
+    {
+        fprintf(file, "%c", cmd->str[i++]);
+        sleep(0.025);
+    }
+    fclose(file);
+}
+
+/**
  * Reads the contents of a file and
  * writes it onto read.txt.
  */
@@ -85,23 +102,6 @@ void readcmd(CMD *cmd)
     else
         fprintf(f_read, "FILE DNE\n");
     fclose(f_read);
-}
-
-/**
- * Writes a string on the specified
- * file and creates the file if it
- * doesn't exist.
- */
-void writecmd(CMD *cmd)
-{
-    FILE *file = fopen(cmd->dir, "a");
-    int i = 0;
-    while (cmd->str[i] != '\0')
-    {
-        fprintf(file, "%c", cmd->str[i++]);
-        sleep(0.025);
-    }
-    fclose(file);
 }
 
 /*
@@ -138,16 +138,14 @@ void emptycmd(CMD *cmd)
 CMD *parsecmd(char *buf)
 {
     CMD *cmd = malloc(sizeof(CMD));
-    char *command;
-    char *dir;
-    char *str;
-
     cmd->type = INVALID;
     strcpy(cmd->input, buf);
 
-    command = strtok(buf, " ");
+    char *command = strtok(buf, " ");
     if (!command)
         return cmd;
+    char *dir;
+    char *str;
 
     if (strcmp(command, "write") == 0)
     {
@@ -198,7 +196,7 @@ int getcmd(char *buf, int nbuf)
 void emptyfiles()
 {
     int i = 4;
-    char *files[4] = {"commands.txt", "read.txt", "empty.txt", "dump.txt"};
+    char *files[] = {"commands.txt", "read.txt", "empty.txt", "dump.txt"};
     FILE *file;
     while (i--)
         file = fopen(files[i], "w");
@@ -210,4 +208,4 @@ void emptyfiles()
  * corresponds to the function that
  * is being executed.
  */
-void (*execute[])(CMD *) = {invalidcmd, readcmd, writecmd, emptycmd};
+void (*execute[])(CMD *) = {invalidcmd, writecmd, readcmd, emptycmd};

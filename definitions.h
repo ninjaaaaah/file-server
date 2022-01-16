@@ -2,8 +2,8 @@
 
 #define BUFFER 50
 #define INVALID 0
-#define READ 1
-#define WRITE 2
+#define WRITE 1
+#define READ 2
 #define EMPTY 3
 
 /**
@@ -62,9 +62,3 @@ struct fqueue
     File *head;
     File *tail;
 };
-
-/**
- * Thread that is assigned to run
- * the worker function.
- */
-pthread_t t_worker;
